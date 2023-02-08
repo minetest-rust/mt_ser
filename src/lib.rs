@@ -1,5 +1,6 @@
 pub use enumset;
 pub use flate2;
+pub use paste::paste;
 
 #[cfg(feature = "random")]
 pub use generate_random;
@@ -14,13 +15,13 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use enumset::{EnumSet, EnumSetType, EnumSetTypeWithRepr};
 use mt_data_derive::mt_derive;
 pub use mt_data_derive::{MtDeserialize, MtSerialize};
-use paste::paste;
 use std::{
     collections::{HashMap, HashSet},
     convert::Infallible,
     fmt,
     io::{self, Read, Write},
     num::TryFromIntError,
+    ops::Deref,
 };
 use thiserror::Error;
 
@@ -88,11 +89,11 @@ pub trait MtCfg:
     fn write_len(len: usize, writer: &mut impl Write) -> Result<(), SerializeError> {
         Ok(Self::try_from(len)
             .map_err(|e| e.into())?
-            .mt_serialize::<DefaultCfg>(writer)?)
+            .mt_serialize::<DefCfg>(writer)?)
     }
 }
 
-pub type DefaultCfg = u16;
+pub type DefCfg = u16;
 
 pub trait MtSerialize: Sized {
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError>;
@@ -161,13 +162,13 @@ pub struct Utf16<B: MtCfg>(pub B);
 
 impl<B: MtCfg> MtSerialize for Utf16<B> {
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
-        self.0.mt_serialize::<DefaultCfg>(writer)
+        self.0.mt_serialize::<DefCfg>(writer)
     }
 }
 
 impl<B: MtCfg> MtDeserialize for Utf16<B> {
     fn mt_deserialize<C: MtCfg>(reader: &mut impl Read) -> Result<Self, DeserializeError> {
-        Ok(Self(B::mt_deserialize::<DefaultCfg>(reader)?))
+        Ok(Self(B::mt_deserialize::<DefCfg>(reader)?))
     }
 }
 
@@ -266,23 +267,29 @@ impl MtSerialize for () {
 
 impl MtSerialize for bool {
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
-        (*self as u8).mt_serialize::<DefaultCfg>(writer)
+        (*self as u8).mt_serialize::<DefCfg>(writer)
     }
 }
 
 impl<T: MtSerialize, const N: usize> MtSerialize for [T; N] {
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
-        for item in self.iter() {
-            item.mt_serialize::<DefaultCfg>(writer)?;
-        }
+        self.as_slice().mt_serialize::<NoLen>(writer)
+    }
+}
 
+impl<T: MtSerialize> MtSerialize for &[T] {
+    fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
+        C::write_len(self.len(), writer)?;
+        for item in self.iter() {
+            item.mt_serialize::<DefCfg>(writer)?;
+        }
         Ok(())
     }
 }
 
 impl<T: MtSerialize, E: EnumSetTypeWithRepr<Repr = T>> MtSerialize for EnumSet<E> {
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
-        self.as_repr().mt_serialize::<DefaultCfg>(writer)
+        self.as_repr().mt_serialize::<DefCfg>(writer)
     }
 }
 
@@ -297,11 +304,7 @@ impl<T: MtSerialize> MtSerialize for Option<T> {
 
 impl<T: MtSerialize> MtSerialize for Vec<T> {
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
-        C::write_len(self.len(), writer)?;
-        for item in self.iter() {
-            item.mt_serialize::<DefaultCfg>(writer)?;
-        }
-        Ok(())
+        self.as_slice().mt_serialize::<C>(writer)
     }
 }
 
@@ -309,7 +312,7 @@ impl<T: MtSerialize> MtSerialize for HashSet<T> {
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
         C::write_len(self.len(), writer)?;
         for item in self.iter() {
-            item.mt_serialize::<DefaultCfg>(writer)?;
+            item.mt_serialize::<DefCfg>(writer)?;
         }
         Ok(())
     }
@@ -323,8 +326,8 @@ where
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
         C::write_len(self.len(), writer)?;
         for (key, value) in self.iter() {
-            key.mt_serialize::<DefaultCfg>(writer)?;
-            value.mt_serialize::<DefaultCfg>(writer)?;
+            key.mt_serialize::<DefCfg>(writer)?;
+            value.mt_serialize::<DefCfg>(writer)?;
         }
         Ok(())
     }
@@ -333,14 +336,18 @@ where
 impl MtSerialize for String {
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
         if C::utf16() {
-            // TODO
-            Err(SerializeError::Unimplemented)
+            self.encode_utf16()
+                .collect::<Vec<_>>()
+                .mt_serialize::<C>(writer)
         } else {
-            C::write_len(self.len(), writer)?;
-            writer.write_all(self.as_bytes())?;
-
-            Ok(())
+            self.as_bytes().mt_serialize::<C>(writer)
         }
+    }
+}
+
+impl<T: MtSerialize> MtSerialize for Box<T> {
+    fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
+        self.deref().mt_serialize::<C>(writer)
     }
 }
 

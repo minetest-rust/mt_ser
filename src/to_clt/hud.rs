@@ -118,9 +118,9 @@ pub struct MinimapModePkt {
 impl MtSerialize for MinimapModePkt {
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
         C::write_len(self.modes.len(), writer)?;
-        self.current.mt_serialize::<DefaultCfg>(writer)?;
+        self.current.mt_serialize::<DefCfg>(writer)?;
         for item in self.modes.iter() {
-            item.mt_serialize::<DefaultCfg>(writer)?;
+            item.mt_serialize::<DefCfg>(writer)?;
         }
         Ok(())
     }

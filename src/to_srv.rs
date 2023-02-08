@@ -1,12 +1,26 @@
 use crate::*;
 
+#[mt_derive(to = "srv", repr = "u32", enumset)]
+pub enum Key {
+    Forward,
+    Backward,
+    Left,
+    Right,
+    Jump,
+    Special,
+    Sneak,
+    Dig,
+    Place,
+    Zoom,
+}
+
 #[mt_derive(to = "srv")]
 pub struct PlayerPos {
-    #[mt(const_u16 = 1)] // supported compression
     pub pos_100: [i32; 3],
     pub vel_100: [i32; 3],
     pub pitch_100: i32,
     pub yaw_100: i32,
+    pub keys: EnumSet<Key>,
     pub fov_80: u8,
     pub wanted_range: u8,
 }
@@ -29,7 +43,7 @@ pub enum ToSrvPkt {
     Nil = 0,
     Init {
         serialize_version: u8,
-        #[mt(const_u16 = 1)] // supported compression
+        #[mt(const16 = 1)] // supported compression
         min_proto_version: u16,
         max_proto_version: u16,
         player_name: String,
@@ -76,7 +90,7 @@ pub enum ToSrvPkt {
     Interact {
         action: Interaction,
         item_slot: u16,
-        #[mt(size_u32)]
+        #[mt(size32)]
         pointed: PointedThing,
         pos: PlayerPos,
     } = 57,

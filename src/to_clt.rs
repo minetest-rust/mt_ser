@@ -127,13 +127,13 @@ pub enum ToCltPkt {
     Media {
         n: u16,
         i: u16,
-        files: Vec<MediaPayload>,
+        files: Vec<MediaPayload>, // FIXME: can we use a HashMap for this?
     } = 56,
     NodeDefs {
         defs: Vec<NodeDef>,
     } = 58,
     AnnounceMedia {
-        files: Vec<MediaAnnounce>,
+        files: Vec<MediaAnnounce>, // FIXME: can we use a HashMap for this?
         url: String,
     } = 60,
     #[mt(size32, zlib)]
@@ -159,7 +159,7 @@ pub enum ToCltPkt {
         id: u32,
     } = 64,
     Privs {
-        privs: Vec<String>,
+        privs: HashSet<String>,
     } = 65,
     InvFormspec {
         #[mt(size32)]
@@ -283,7 +283,7 @@ pub enum ToCltPkt {
     } = 85,
     UpdatePlayerList {
         update_type: PlayerListUpdateType,
-        players: Vec<String>,
+        players: HashSet<String>,
     } = 86,
     ModChanMsg {
         channel: String,
@@ -322,9 +322,5 @@ pub enum ToCltPkt {
     FormspecPrepend {
         prepend: String,
     } = 97,
-    MinimapModes {
-        #[mt(len = "modes")]
-        current: u16,
-        modes: Vec<MinimapMode>,
-    } = 98,
+    MinimapModes(MinimapModePkt) = 98,
 }

@@ -305,9 +305,8 @@ fn serialize_args(res: darling::Result<MtArgs>, body: impl FnOnce(&MtArgs) -> To
 			impl_size!(size32, u32);
 			impl_size!(size64, u64);
 
-
 			code
-		},
+		}
 		Err(e) => return e.write_errors(),
 	}
 }
@@ -315,10 +314,12 @@ fn serialize_args(res: darling::Result<MtArgs>, body: impl FnOnce(&MtArgs) -> To
 fn serialize_fields(fields: &Fields) -> TokStr {
 	fields
 		.iter()
-		.map(|(ident, field)| serialize_args(MtArgs::from_field(field), |args| {
-			let cfg = get_cfg(args);
-			quote! { mt_data::MtSerialize::mt_serialize::<#cfg>(#ident, __writer)?; }
-		}))
+		.map(|(ident, field)| {
+			serialize_args(MtArgs::from_field(field), |args| {
+				let cfg = get_cfg(args);
+				quote! { mt_data::MtSerialize::mt_serialize::<#cfg>(#ident, __writer)?; }
+			})
+		})
 		.collect()
 }
 
@@ -343,7 +344,9 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
 					let discr = v.discriminant.clone().map(|x| x.1).unwrap_or(discr);
 
 					let ident_fn = match &v.fields {
-						syn::Fields::Unnamed(_) => |f| quote! { mt_data::paste! { [<field_ #f>] }},
+						syn::Fields::Unnamed(_) => |f| quote! {
+							mt_data::paste::paste! { [<field_ #f>] }
+						},
 						_ => |f| quote! { #f },
 					};
 

@@ -115,18 +115,32 @@ pub struct MinimapModePkt {
     modes: Vec<MinimapMode>,
 }
 
+#[cfg(feature = "server")]
 impl MtSerialize for MinimapModePkt {
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
-        C::write_len(self.modes.len(), writer)?;
+        DefCfg::write_len(self.modes.len(), writer)?;
         self.current.mt_serialize::<DefCfg>(writer)?;
-        for item in self.modes.iter() {
-            item.mt_serialize::<DefCfg>(writer)?;
-        }
+        self.modes.mt_serialize::<NoLen>(writer)?;
+
         Ok(())
     }
 }
+
+#[cfg(feature = "client")]
+impl MtDeserialize for MinimapModePkt {
+    fn mt_deserialize<C: MtCfg>(reader: &mut impl Read) -> Result<Self, DeserializeError> {
+        let range = DefCfg::read_len(reader)?;
+        let current = MtDeserialize::mt_deserialize::<DefCfg>(reader)?;
+        let modes = range
+            .map(|_| MtDeserialize::mt_deserialize::<DefCfg>(reader))
+            .try_collect()?;
+
+        Ok(Self { current, modes })
+    }
+}
+
 /*
-TODO: rustify
+TODO: rustify this
 
 var DefaultMinimap = []MinimapMode{
     {Type: NoMinimap},

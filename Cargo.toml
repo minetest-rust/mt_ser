@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
+all = ["client", "server", "random", "serde"]
 client = []
 random = ["dep:generate-random", "dep:rand"]
 serde = ["dep:serde", "dep:serde_arrays", "enumset/serde"]

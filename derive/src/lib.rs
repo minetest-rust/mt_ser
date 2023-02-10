@@ -24,19 +24,16 @@ struct MacroArgs {
 }
 
 fn wrap_attr(attr: &mut syn::Attribute) {
+	let path = attr.path.clone();
+	let tokens = attr.tokens.clone();
+
 	match attr.path.get_ident().map(|i| i.to_string()).as_deref() {
 		Some("mt") => {
-			let path = attr.path.clone();
-			let tokens = attr.tokens.clone();
-
 			*attr = parse_quote! {
 				#[cfg_attr(any(feature = "client", feature = "server"), #path #tokens)]
 			};
 		}
 		Some("serde") => {
-			let path = attr.path.clone();
-			let tokens = attr.tokens.clone();
-
 			*attr = parse_quote! {
 				#[cfg_attr(feature = "serde", #path #tokens)]
 			};
@@ -176,15 +173,15 @@ struct MtArgs {
 	len64: bool,
 	utf16: bool,
 	zlib: bool,
-	zstd: bool,
+	zstd: bool, // TODO
 	default: bool,
 }
 
 fn get_cfg(args: &MtArgs) -> syn::Type {
-	let mut ty: syn::Type = parse_quote! { mt_data::DefCfg  };
+	let mut ty: syn::Type = parse_quote! { mt_ser::DefCfg  };
 
 	if args.len0 {
-		ty = parse_quote! { mt_data::NoLen };
+		ty = parse_quote! { () };
 	}
 
 	macro_rules! impl_len {
@@ -201,37 +198,11 @@ fn get_cfg(args: &MtArgs) -> syn::Type {
 	impl_len!(len64, u64);
 
 	if args.utf16 {
-		ty = parse_quote! { mt_data::Utf16<#ty> };
+		ty = parse_quote! { mt_ser::Utf16<#ty> };
 	}
 
 	ty
 }
-
-/*
-fn is_ident(path: &syn::Path, ident: &str) -> bool {
-	matches!(path.segments.first().map(|p| &p.ident), Some(idt) if idt == ident)
-}
-
-fn get_type_generics<const N: usize>(path: &syn::Path) -> Option<[&syn::Type; N]> {
-	use syn::{AngleBracketedGenericArguments as Args, PathArguments::AngleBracketed};
-
-	path.segments
-		.first()
-		.map(|seg| match &seg.arguments {
-			AngleBracketed(Args { args, .. }) => args
-				.iter()
-				.flat_map(|arg| match arg {
-					syn::GenericArgument::Type(t) => Some(t),
-					_ => None,
-				})
-				.collect::<Vec<_>>()
-				.try_into()
-				.ok(),
-			_ => None,
-		})
-		.flatten()
-}
-*/
 
 type Fields<'a> = Vec<(TokStr, &'a syn::Field)>;
 
@@ -261,7 +232,7 @@ fn serialize_args(res: darling::Result<MtArgs>, body: impl FnOnce(&MtArgs) -> To
 				($name:ident) => {
 					if let Some(x) = args.$name {
 						code.extend(quote! {
-							#x.mt_serialize::<mt_data::DefCfg>(__writer)?;
+							#x.mt_serialize::<mt_ser::DefCfg>(__writer)?;
 						});
 					}
 				};
@@ -277,7 +248,10 @@ fn serialize_args(res: darling::Result<MtArgs>, body: impl FnOnce(&MtArgs) -> To
 			if args.zlib {
 				code = quote! {
 					let mut __writer = {
-						let mut __stream = mt_data::flate2::write::ZlibEncoder::new(__writer, flate2::Compression::default());
+						let mut __stream = mt_ser::flate2::write::ZlibEncoder::new(
+							__writer,
+							mt_ser::flate2::Compression::default(),
+						);
 						let __writer = &mut __stream;
 						#code
 						__stream.finish()?
@@ -289,7 +263,7 @@ fn serialize_args(res: darling::Result<MtArgs>, body: impl FnOnce(&MtArgs) -> To
 				($name:ident, $T:ty) => {
 					if args.$name {
 						code = quote! {
-								mt_data::MtSerialize::mt_serialize::<$T>(&{
+								mt_ser::MtSerialize::mt_serialize::<$T>(&{
 									let mut __buf = Vec::new();
 									let __writer = &mut __buf;
 									#code
@@ -317,7 +291,7 @@ fn serialize_fields(fields: &Fields) -> TokStr {
 		.map(|(ident, field)| {
 			serialize_args(MtArgs::from_field(field), |args| {
 				let cfg = get_cfg(args);
-				quote! { mt_data::MtSerialize::mt_serialize::<#cfg>(#ident, __writer)?; }
+				quote! { mt_ser::MtSerialize::mt_serialize::<#cfg>(#ident, __writer)?; }
 			})
 		})
 		.collect()
@@ -345,7 +319,7 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
 
 					let ident_fn = match &v.fields {
 						syn::Fields::Unnamed(_) => |f| quote! {
-							mt_data::paste::paste! { [<field_ #f>] }
+							mt_ser::paste::paste! { [<field_ #f>] }
 						},
 						_ => |f| quote! { #f },
 					};
@@ -369,7 +343,7 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
 						quote! {
 							#before
 							#typename::#variant #destruct => {
-								mt_data::MtSerialize::mt_serialize::<mt_data::DefCfg>(&((#discr) as #repr), __writer)?;
+								mt_ser::MtSerialize::mt_serialize::<mt_ser::DefCfg>(&((#discr) as #repr), __writer)?;
 								#code
 							}
 						}
@@ -390,8 +364,8 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
 
 	quote! {
 		#[automatically_derived]
-		impl mt_data::MtSerialize for #typename {
-			fn mt_serialize<C: MtCfg>(&self, __writer: &mut impl std::io::Write) -> Result<(), mt_data::SerializeError> {
+		impl mt_ser::MtSerialize for #typename {
+			fn mt_serialize<C: mt_ser::MtCfg>(&self, __writer: &mut impl std::io::Write) -> Result<(), mt_ser::SerializeError> {
 				#code
 
 				Ok(())
@@ -407,9 +381,9 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
 	} = parse_macro_input!(input);
 	quote! {
 		#[automatically_derived]
-		impl mt_data::MtDeserialize for #typename {
-			fn mt_deserialize<C: MtCfg>(__reader: &mut impl std::io::Read) -> Result<Self, mt_data::DeserializeError> {
-				Err(mt_data::DeserializeError::Unimplemented)
+		impl mt_ser::MtDeserialize for #typename {
+			fn mt_deserialize<C: mt_ser::MtCfg>(__reader: &mut impl std::io::Read) -> Result<Self, mt_ser::DeserializeError> {
+				Err(mt_ser::DeserializeError::Unimplemented)
 			}
 		}
 	}.into()

@@ -1,23 +1,12 @@
 [package]
-name = "mt_data"
+name = "mt_ser"
 version = "0.1.0"
 edition = "2021"
-
-[features]
-all = ["client", "server", "random", "serde"]
-client = []
-random = ["dep:generate-random", "dep:rand"]
-serde = ["dep:serde", "dep:serde_arrays", "enumset/serde"]
-server = []
 
 [dependencies]
 byteorder = "1.4.3"
 enumset = { git = "https://github.com/Lymia/enumset" }
 flate2 = { version = "1.0.25", features = ["zlib"], default-features = false }
-generate-random = { git = "https://github.com/minetest-rust/generate-random", features = ["enumset"], optional = true }
-mt_data_derive = { path = "derive" }
+mt_ser_derive = { path = "derive" }
 paste = "1.0.11"
-rand = { version = "0.8.5", optional = true }
-serde = { version = "1.0.152", features = ["derive"], optional = true }
-serde_arrays = { version = "0.1.0", optional = true }
 thiserror = "1.0.38"

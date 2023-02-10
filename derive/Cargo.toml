@@ -1,5 +1,5 @@
 [package]
-name = "mt_data_derive"
+name = "mt_ser_derive"
 version = "0.1.0"
 edition = "2021"
 

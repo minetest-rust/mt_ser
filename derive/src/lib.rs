@@ -217,7 +217,7 @@ fn get_fields(fields: &syn::Fields, ident: impl Fn(TokStr) -> TokStr) -> Fields 
 			.unnamed
 			.iter()
 			.enumerate()
-			.map(|(i, f)| (ident(i.to_string().to_token_stream()), f))
+			.map(|(i, f)| (ident(syn::Index::from(i).to_token_stream()), f))
 			.collect(),
 		syn::Fields::Unit => Vec::new(),
 	}
@@ -226,24 +226,7 @@ fn get_fields(fields: &syn::Fields, ident: impl Fn(TokStr) -> TokStr) -> Fields 
 fn serialize_args(res: darling::Result<MtArgs>, body: impl FnOnce(&MtArgs) -> TokStr) -> TokStr {
 	match res {
 		Ok(args) => {
-			let mut code = TokStr::new();
-
-			macro_rules! impl_const {
-				($name:ident) => {
-					if let Some(x) = args.$name {
-						code.extend(quote! {
-							#x.mt_serialize::<mt_ser::DefCfg>(__writer)?;
-						});
-					}
-				};
-			}
-
-			impl_const!(const8);
-			impl_const!(const16);
-			impl_const!(const32);
-			impl_const!(const64);
-
-			code.extend(body(&args));
+			let mut code = body(&args);
 
 			if args.zlib {
 				code = quote! {
@@ -279,6 +262,22 @@ fn serialize_args(res: darling::Result<MtArgs>, body: impl FnOnce(&MtArgs) -> To
 			impl_size!(size32, u32);
 			impl_size!(size64, u64);
 
+			macro_rules! impl_const {
+				($name:ident) => {
+					if let Some(x) = args.$name {
+						code = quote! {
+							#x.mt_serialize::<mt_ser::DefCfg>(__writer)?;
+							#code
+						};
+					}
+				};
+			}
+
+			impl_const!(const8);
+			impl_const!(const16);
+			impl_const!(const32);
+			impl_const!(const64);
+
 			code
 		}
 		Err(e) => return e.write_errors(),
@@ -289,30 +288,6 @@ fn deserialize_args(res: darling::Result<MtArgs>, body: impl FnOnce(&MtArgs) -> 
 	match res {
 		Ok(args) => {
 			let mut code = body(&args);
-
-			macro_rules! impl_const {
-				($name:ident) => {
-					if let Some(want) = args.$name {
-						code = quote! {
-							mt_ser::MtDeserialize::mt_deserialize::<mt_ser::DefCfg>(__reader)
-								.and_then(|got| {
-									if #want == got {
-										#code
-									} else {
-										Err(mt_ser::DeserializeError::InvalidConst(
-											#want as u64, got as u64
-										))
-									}
-								})
-						};
-					}
-				};
-			}
-
-			impl_const!(const64);
-			impl_const!(const32);
-			impl_const!(const16);
-			impl_const!(const8);
 
 			if args.zlib {
 				code = quote! {
@@ -347,9 +322,33 @@ fn deserialize_args(res: darling::Result<MtArgs>, body: impl FnOnce(&MtArgs) -> 
 			impl_size!(size32, u32);
 			impl_size!(size64, u64);
 
+			macro_rules! impl_const {
+				($name:ident) => {
+					if let Some(want) = args.$name {
+						code = quote! {
+							mt_ser::MtDeserialize::mt_deserialize::<mt_ser::DefCfg>(__reader)
+								.and_then(|got| {
+									if #want == got {
+										#code
+									} else {
+										Err(mt_ser::DeserializeError::InvalidConst(
+											#want as u64, got as u64
+										))
+									}
+								})
+						};
+					}
+				};
+			}
+
+			impl_const!(const8);
+			impl_const!(const16);
+			impl_const!(const32);
+			impl_const!(const64);
+
 			code
 		}
-		Err(e) => return e.write_errors()
+		Err(e) => return e.write_errors(),
 	}
 }
 
@@ -374,7 +373,7 @@ fn deserialize_fields(fields: &Fields) -> TokStr {
 				let mut code = quote! { mt_ser::MtDeserialize::mt_deserialize::<#cfg>(__reader) };
 
 				if args.default {
-					code = quote!{
+					code = quote! {
 						mt_ser::OrDefault::or_default(#code)
 					};
 				}
@@ -382,7 +381,7 @@ fn deserialize_fields(fields: &Fields) -> TokStr {
 				code
 			});
 
-			quote!{
+			quote! {
 				let #ident = #code?;
 			}
 		})
@@ -391,14 +390,17 @@ fn deserialize_fields(fields: &Fields) -> TokStr {
 
 fn get_fields_struct(input: &syn::Fields) -> (Fields, TokStr) {
 	let ident_fn = match input {
-		syn::Fields::Unnamed(_) => |f| quote! {
-			mt_ser::paste::paste! { [<field_ #f>] }
+		syn::Fields::Unnamed(_) => |f| {
+			quote! {
+				mt_ser::paste::paste! { [<field_ #f>] }
+			}
 		},
 		_ => |f| quote! { #f },
 	};
 
 	let fields = get_fields(input, ident_fn);
-	let fields_comma: TokStr = fields.iter()
+	let fields_comma: TokStr = fields
+		.iter()
 		.rfold(TokStr::new(), |after, (ident, _)| quote! { #ident, #after });
 
 	let fields_struct = match input {
@@ -521,16 +523,16 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
 					x => Err(mt_ser::DeserializeError::InvalidEnumVariant(#type_str, x as u64))
 				}
 			}
-		},
+		}
 		syn::Data::Struct(s) => {
 			let (fields, fields_struct) = get_fields_struct(&s.fields);
 			let code = deserialize_fields(&fields);
 
-			quote!{
+			quote! {
 				#code
 				Ok(Self #fields_struct)
 			}
-		},
+		}
 		_ => {
 			panic!("only enum and struct supported");
 		}

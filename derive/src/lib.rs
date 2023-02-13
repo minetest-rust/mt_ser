@@ -81,10 +81,12 @@ pub fn mt_derive(attr: TokenStream, item: TokenStream) -> TokenStream {
                 iter!(v.fields, |f| iter!(f.attrs, wrap_attr));
             });
 
-            let repr = args.repr.expect("missing repr for enum");
-
             if args.enumset {
-                let repr_str = repr.to_token_stream().to_string();
+                let repr_str = args
+                    .repr
+                    .expect("missing repr for enum")
+                    .to_token_stream()
+                    .to_string();
 
                 out.extend(quote! {
                     #[derive(EnumSetType)]
@@ -115,8 +117,15 @@ pub fn mt_derive(attr: TokenStream, item: TokenStream) -> TokenStream {
                     });
                 }
 
+                if let Some(repr) = args.repr {
+                    out.extend(quote! {
+                        #[repr(#repr)]
+                    });
+                } else if !args.custom {
+                    panic!("missing repr for enum");
+                }
+
                 out.extend(quote! {
-                    #[repr(#repr)]
                     #[derive(Clone, PartialEq)]
                 });
 

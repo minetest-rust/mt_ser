@@ -28,6 +28,8 @@ pub enum SerializeError {
     IoError(#[from] io::Error),
     #[error("collection too big: {0}")]
     TooBig(#[from] TryFromIntError),
+    #[error("{0}")]
+    Other(String),
 }
 
 impl From<Infallible> for SerializeError {
@@ -50,6 +52,8 @@ pub enum DeserializeError {
     InvalidEnumVariant(&'static str, u64),
     #[error("invalid constant - wanted: {0:?} - got: {1:?}")]
     InvalidConst(Box<dyn Debug>, Box<dyn Debug>),
+    #[error("{0}")]
+    Other(String),
 }
 
 impl From<Infallible> for DeserializeError {

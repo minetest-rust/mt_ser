@@ -130,8 +130,8 @@ pub fn mt_derive(attr: TokenStream, item: TokenStream) -> TokenStream {
                 if let Some(repr) = args.repr {
                     if repr == parse_quote! { str } {
                         out.extend(quote! {
-                            #[mt(string_repr)]
-                        });
+							#[cfg_attr(any(feature = "client", feature = "server"), mt(string_repr))]
+						});
                     } else {
                         out.extend(quote! {
                             #[repr(#repr)]

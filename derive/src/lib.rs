@@ -277,7 +277,7 @@ fn deserialize_args(res: darling::Result<MtArgs>, body: impl FnOnce(&MtArgs) -> 
                         fn deserialize_same_type<T: MtDeserialize>(
                             _: &T,
                             reader: &mut impl std::io::Read
-                        ) -> Result<T, DeserializeError> {
+                        ) -> Result<T, mt_ser::DeserializeError> {
                             T::mt_deserialize::<mt_ser::DefCfg>(reader)
                         }
 

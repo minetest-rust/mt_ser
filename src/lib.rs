@@ -136,6 +136,7 @@ pub trait MtLen {
 
 pub trait MtCfg {
     type Len: MtLen;
+    type Inner: MtCfg;
 
     fn utf16() -> bool {
         false
@@ -180,6 +181,7 @@ trait MtCfgLen:
 
 impl<T: MtCfgLen> MtCfg for T {
     type Len = usize;
+    type Inner = DefCfg;
 
     fn write_len(len: usize, writer: &mut impl Write) -> Result<(), SerializeError> {
         Self::try_from(len)
@@ -203,6 +205,7 @@ pub type DefCfg = u16;
 
 impl MtCfg for () {
     type Len = ();
+    type Inner = DefCfg;
 
     fn write_len(_len: usize, _writer: &mut impl Write) -> Result<(), SerializeError> {
         Ok(())
@@ -233,6 +236,7 @@ pub struct Utf16<B: MtCfg = DefCfg>(pub B);
 
 impl<B: MtCfg> MtCfg for Utf16<B> {
     type Len = B::Len;
+    type Inner = B::Inner;
 
     fn utf16() -> bool {
         true
@@ -244,6 +248,19 @@ impl<B: MtCfg> MtCfg for Utf16<B> {
 
     fn read_len(reader: &mut impl Read) -> Result<Self::Len, DeserializeError> {
         B::read_len(reader)
+    }
+}
+
+impl<A: MtCfg, B: MtCfg> MtCfg for (A, B) {
+    type Len = A::Len;
+    type Inner = B;
+
+    fn write_len(len: usize, writer: &mut impl Write) -> Result<(), SerializeError> {
+        A::write_len(len, writer)
+    }
+
+    fn read_len(reader: &mut impl Read) -> Result<Self::Len, DeserializeError> {
+        A::read_len(reader)
     }
 }
 
@@ -345,25 +362,25 @@ pub fn mt_serialize_seq<C: MtCfg, T: MtSerialize>(
     C::write_len(iter.len(), writer)?;
 
     iter.into_iter()
-        .try_for_each(|item| item.mt_serialize::<DefCfg>(writer))
+        .try_for_each(|item| item.mt_serialize::<C::Inner>(writer))
 }
 
 pub fn mt_deserialize_seq<'a, C: MtCfg, T: MtDeserialize>(
     reader: &'a mut impl Read,
 ) -> Result<impl Iterator<Item = Result<T, DeserializeError>> + 'a, DeserializeError> {
     let len = C::read_len(reader)?;
-    mt_deserialize_sized_seq(&len, reader)
+    mt_deserialize_sized_seq::<C, _>(&len, reader)
 }
 
-pub fn mt_deserialize_sized_seq<'a, L: MtLen, T: MtDeserialize>(
-    len: &L,
+pub fn mt_deserialize_sized_seq<'a, C: MtCfg, T: MtDeserialize>(
+    len: &C::Len,
     reader: &'a mut impl Read,
 ) -> Result<impl Iterator<Item = Result<T, DeserializeError>> + 'a, DeserializeError> {
     let variable = len.option().is_none();
 
     Ok(len
         .range()
-        .map_while(move |_| match T::mt_deserialize::<DefCfg>(reader) {
+        .map_while(move |_| match T::mt_deserialize::<C::Inner>(reader) {
             Err(DeserializeError::UnexpectedEof) if variable => None,
             x => Some(x),
         }))
@@ -437,8 +454,8 @@ impl<T: MtDeserialize + std::cmp::Eq + std::hash::Hash> MtDeserialize for HashSe
 // TODO: support more tuples
 impl<A: MtSerialize, B: MtSerialize> MtSerialize for (A, B) {
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
-        self.0.mt_serialize::<DefCfg>(writer)?;
-        self.1.mt_serialize::<DefCfg>(writer)?;
+        self.0.mt_serialize::<C>(writer)?;
+        self.1.mt_serialize::<C::Inner>(writer)?;
 
         Ok(())
     }
@@ -446,8 +463,8 @@ impl<A: MtSerialize, B: MtSerialize> MtSerialize for (A, B) {
 
 impl<A: MtDeserialize, B: MtDeserialize> MtDeserialize for (A, B) {
     fn mt_deserialize<C: MtCfg>(reader: &mut impl Read) -> Result<Self, DeserializeError> {
-        let a = A::mt_deserialize::<DefCfg>(reader)?;
-        let b = B::mt_deserialize::<DefCfg>(reader)?;
+        let a = A::mt_deserialize::<C>(reader)?;
+        let b = B::mt_deserialize::<C::Inner>(reader)?;
 
         Ok((a, b))
     }

@@ -48,8 +48,8 @@ pub enum DeserializeError {
     TooBig(#[from] TryFromIntError),
     #[error("invalid UTF-16: {0}")]
     InvalidUtf16(#[from] std::char::DecodeUtf16Error),
-    #[error("invalid {0} enum variant {1}")]
-    InvalidEnumVariant(&'static str, u64),
+    #[error("invalid {0} enum variant {1:?}")]
+    InvalidEnum(&'static str, Box<dyn Debug>),
     #[error("invalid constant - wanted: {0:?} - got: {1:?}")]
     InvalidConst(Box<dyn Debug>, Box<dyn Debug>),
     #[error("{0}")]

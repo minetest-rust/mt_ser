@@ -494,7 +494,7 @@ where
     }
 }
 
-impl MtSerialize for String {
+impl MtSerialize for &str {
     fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
         if C::utf16() {
             self.encode_utf16()
@@ -503,6 +503,12 @@ impl MtSerialize for String {
         } else {
             mt_serialize_seq::<C, _>(writer, self.as_bytes().iter())
         }
+    }
+}
+
+impl MtSerialize for String {
+    fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
+        self.as_str().mt_serialize::<C>(writer)
     }
 }
 

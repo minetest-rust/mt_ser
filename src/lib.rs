@@ -194,9 +194,9 @@ impl<T: MtCfgLen> MtCfg for T {
     }
 
     fn read_len(reader: &mut impl Read) -> Result<Self::Len, DeserializeError> {
-        Ok(Self::mt_deserialize::<DefCfg>(reader)?
+        Self::mt_deserialize::<DefCfg>(reader)?
             .try_into()
-            .map_err(Into::into)?)
+            .map_err(Into::into)
     }
 }
 
@@ -369,9 +369,9 @@ pub fn mt_serialize_seq<C: MtCfg, T: MtSerialize>(
         .try_for_each(|item| item.mt_serialize::<C::Inner>(writer))
 }
 
-pub fn mt_deserialize_seq<'a, C: MtCfg, T: MtDeserialize>(
-    reader: &'a mut impl Read,
-) -> Result<impl Iterator<Item = Result<T, DeserializeError>> + 'a, DeserializeError> {
+pub fn mt_deserialize_seq<C: MtCfg, T: MtDeserialize>(
+    reader: &mut impl Read,
+) -> Result<impl Iterator<Item = Result<T, DeserializeError>> + '_, DeserializeError> {
     let len = C::read_len(reader)?;
     mt_deserialize_sized_seq::<C, _>(&len, reader)
 }

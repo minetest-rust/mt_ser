@@ -45,10 +45,8 @@ fn wrap_attr(attr: &mut syn::Attribute) {
 
 #[proc_macro_attribute]
 pub fn mt_derive(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let item2 = item.clone();
-
     let attr_args = parse_macro_input!(attr as syn::AttributeArgs);
-    let mut input = parse_macro_input!(item2 as syn::Item);
+    let mut input = parse_macro_input!(item as syn::Item);
 
     let args = match MacroArgs::from_list(&attr_args) {
         Ok(v) => v,
@@ -256,7 +254,7 @@ fn serialize_args(res: darling::Result<MtArgs>, body: impl FnOnce(&MtArgs) -> To
 
             code
         }
-        Err(e) => return e.write_errors(),
+        Err(e) => e.write_errors(),
     }
 }
 
@@ -335,7 +333,7 @@ fn deserialize_args(res: darling::Result<MtArgs>, body: impl FnOnce(&MtArgs) -> 
 
             code
         }
-        Err(e) => return e.write_errors(),
+        Err(e) => e.write_errors(),
     }
 }
 
@@ -426,7 +424,7 @@ fn iter_variants(e: &syn::DataEnum, args: &MtArgs, mut f: impl FnMut(&syn::Varia
             v.discriminant.clone().map(|x| x.1).unwrap_or(discr)
         };
 
-        f(&v, &discr);
+        f(v, &discr);
 
         discr = parse_quote! { 1 + #discr };
     }
@@ -440,10 +438,10 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
     let code = serialize_args(MtArgs::from_derive_input(&input), |args| {
         match &input.data {
             syn::Data::Enum(e) => {
-                let repr = get_repr(&input, &args);
+                let repr = get_repr(&input, args);
                 let mut variants = TokStr::new();
 
-                iter_variants(&e, &args, |v, discr| {
+                iter_variants(e, args, |v, discr| {
                     let (fields, fields_struct) = get_fields_struct(&v.fields);
                     let code =
                         serialize_args(MtArgs::from_variant(v), |_| serialize_fields(&fields));
@@ -492,12 +490,12 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let code = deserialize_args(MtArgs::from_derive_input(&input), |args| {
         match &input.data {
             syn::Data::Enum(e) => {
-                let repr = get_repr(&input, &args);
+                let repr = get_repr(&input, args);
 
                 let mut consts = TokStr::new();
                 let mut arms = TokStr::new();
 
-                iter_variants(&e, &args, |v, discr| {
+                iter_variants(e, args, |v, discr| {
                     let ident = &v.ident;
                     let (fields, fields_struct) = get_fields_struct(&v.fields);
                     let code = deserialize_args(MtArgs::from_variant(v), |_| {

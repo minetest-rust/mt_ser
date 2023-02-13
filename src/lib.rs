@@ -12,6 +12,7 @@ use paste::paste as paste_macro;
 use std::{
     collections::{HashMap, HashSet},
     convert::Infallible,
+    fmt::Debug,
     io::{self, Read, Write},
     num::TryFromIntError,
     ops::Deref,
@@ -47,8 +48,8 @@ pub enum DeserializeError {
     InvalidUtf16(#[from] std::char::DecodeUtf16Error),
     #[error("invalid {0} enum variant {1}")]
     InvalidEnumVariant(&'static str, u64),
-    #[error("invalid constant - wanted: {0} - got: {1}")]
-    InvalidConst(u64, u64),
+    #[error("invalid constant - wanted: {0:?} - got: {1:?}")]
+    InvalidConst(Box<dyn Debug>, Box<dyn Debug>),
 }
 
 impl From<Infallible> for DeserializeError {
@@ -228,7 +229,7 @@ impl MtLen for () {
     }
 }
 
-pub struct Utf16<B: MtCfg>(pub B);
+pub struct Utf16<B: MtCfg = DefCfg>(pub B);
 
 impl<B: MtCfg> MtCfg for Utf16<B> {
     type Len = B::Len;

@@ -5,6 +5,7 @@
 pub use flate2;
 pub use mt_ser_derive::{mt_derive, MtDeserialize, MtSerialize};
 pub use paste;
+pub use zstd;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use enumset::{EnumSet, EnumSetTypeWithRepr};

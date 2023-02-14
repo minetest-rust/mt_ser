@@ -10,3 +10,4 @@ flate2 = { version = "1.0.25", features = ["zlib"], default-features = false }
 mt_ser_derive = { path = "derive" }
 paste = "1.0.11"
 thiserror = "1.0.38"
+zstd = "0.12.3"

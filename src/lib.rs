@@ -16,12 +16,14 @@ use std::{
     fmt::Debug,
     io::{self, Read, Write},
     num::TryFromIntError,
-    ops::Deref,
+    ops::{Deref, Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive},
 };
 use thiserror::Error;
 
 #[cfg(test)]
 mod tests;
+
+use crate as mt_ser;
 
 #[derive(Error, Debug)]
 pub enum SerializeError {
@@ -558,4 +560,57 @@ impl<T: MtDeserialize> MtDeserialize for Box<T> {
     fn mt_deserialize<C: MtCfg>(reader: &mut impl Read) -> Result<Self, DeserializeError> {
         Ok(Self::new(T::mt_deserialize::<C>(reader)?))
     }
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Range")]
+#[allow(unused)]
+struct RemoteRange<T> {
+    start: T,
+    end: T,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "RangeFrom")]
+#[allow(unused)]
+struct RemoteRangeFrom<T> {
+    start: T,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "RangeFull")]
+#[allow(unused)]
+struct RemoteRangeFull;
+
+// RangeInclusive fields are private
+impl<T: MtSerialize> MtSerialize for RangeInclusive<T> {
+    fn mt_serialize<C: MtCfg>(&self, writer: &mut impl Write) -> Result<(), SerializeError> {
+        self.start().mt_serialize::<DefCfg>(writer)?;
+        self.end().mt_serialize::<DefCfg>(writer)?;
+
+        Ok(())
+    }
+}
+
+impl<T: MtDeserialize> MtDeserialize for RangeInclusive<T> {
+    fn mt_deserialize<C: MtCfg>(reader: &mut impl Read) -> Result<Self, DeserializeError> {
+        let start = T::mt_deserialize::<DefCfg>(reader)?;
+        let end = T::mt_deserialize::<DefCfg>(reader)?;
+
+        Ok(start..=end)
+    }
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "RangeTo")]
+#[allow(unused)]
+struct RemoteRangeTo<T> {
+    end: T,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "RangeToInclusive")]
+#[allow(unused)]
+struct RemoteRangeToInclusive<T> {
+    end: T,
 }

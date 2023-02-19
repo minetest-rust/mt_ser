@@ -52,9 +52,9 @@ pub enum DeserializeError {
     #[error("invalid UTF-16: {0}")]
     InvalidUtf16(#[from] std::char::DecodeUtf16Error),
     #[error("invalid {0} enum variant {1:?}")]
-    InvalidEnum(&'static str, Box<dyn Debug>),
+    InvalidEnum(&'static str, Box<dyn Debug + Send + Sync>),
     #[error("invalid constant - wanted: {0:?} - got: {1:?}")]
-    InvalidConst(Box<dyn Debug>, Box<dyn Debug>),
+    InvalidConst(Box<dyn Debug + Send + Sync>, Box<dyn Debug + Send + Sync>),
     #[error("{0}")]
     Other(String),
 }

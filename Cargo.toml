@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 byteorder = "1.4.3"
+cgmath = "0.17.0"
+collision = "0.20.1"
 enumset = { git = "https://github.com/Lymia/enumset" }
 flate2 = { version = "1.0.25", features = ["zlib"], default-features = false }
 mt_ser_derive = { path = "derive" }

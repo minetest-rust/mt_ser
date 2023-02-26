@@ -8,6 +8,8 @@ pub use paste;
 pub use zstd;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use cgmath::{Deg, Euler, Point1, Point2, Point3, Rad, Vector1, Vector2, Vector3, Vector4};
+use collision::{Aabb2, Aabb3};
 use enumset::{EnumSet, EnumSetTypeWithRepr};
 use paste::paste as paste_macro;
 use std::{
@@ -613,4 +615,97 @@ struct RemoteRangeTo<T> {
 #[allow(unused)]
 struct RemoteRangeToInclusive<T> {
     end: T,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Vector1")]
+#[allow(unused)]
+struct RemoteVector1<T> {
+    x: T,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Vector2")]
+#[allow(unused)]
+struct RemoteVector2<T> {
+    x: T,
+    y: T,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Vector3")]
+#[allow(unused)]
+struct RemoteVector3<T> {
+    x: T,
+    y: T,
+    z: T,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Vector4")]
+#[allow(unused)]
+struct RemoteVector4<T> {
+    x: T,
+    y: T,
+    z: T,
+    w: T,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Point1")]
+#[allow(unused)]
+struct RemotePoint1<T> {
+    x: T,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Point2")]
+#[allow(unused)]
+struct RemotePoint2<T> {
+    x: T,
+    y: T,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Point3")]
+#[allow(unused)]
+struct RemotePoint3<T> {
+    x: T,
+    y: T,
+    z: T,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Deg")]
+#[allow(unused)]
+struct RemoteDeg<T>(T);
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Rad")]
+#[allow(unused)]
+struct RemoteRad<T>(T);
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Euler")]
+#[allow(unused)]
+struct RemoteEuler<T> {
+    x: T,
+    y: T,
+    z: T,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Aabb2")]
+#[allow(unused)]
+struct RemoteAabb2<T> {
+    min: Point2<T>,
+    max: Point2<T>,
+}
+
+#[derive(MtSerialize, MtDeserialize)]
+#[mt(typename = "Aabb3")]
+#[allow(unused)]
+struct RemoteAabb3<T> {
+    min: Point3<T>,
+    max: Point3<T>,
 }

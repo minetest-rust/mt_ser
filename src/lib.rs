@@ -1,5 +1,4 @@
 #![feature(array_try_from_fn)]
-#![feature(associated_type_bounds)]
 #![feature(iterator_try_collect)]
 
 pub use flate2;
@@ -179,29 +178,22 @@ impl MtLen for usize {
     }
 }
 
-trait MtCfgLen:
-    Sized
-    + MtSerialize
-    + MtDeserialize
-    + TryFrom<usize, Error: Into<SerializeError>>
-    + TryInto<usize, Error: Into<DeserializeError>>
-{
-}
+trait MtCfgLen: Sized + MtSerialize + MtDeserialize + TryFrom<usize> + TryInto<usize> {}
 
-impl<T: MtCfgLen> MtCfg for T {
+impl<T: MtCfgLen> MtCfg for T
+where
+    SerializeError: From<<T as TryFrom<usize>>::Error>,
+    DeserializeError: From<<T as TryInto<usize>>::Error>,
+{
     type Len = usize;
     type Inner = DefCfg;
 
     fn write_len(len: usize, writer: &mut impl Write) -> Result<(), SerializeError> {
-        Self::try_from(len)
-            .map_err(Into::into)?
-            .mt_serialize::<DefCfg>(writer)
+        Self::try_from(len)?.mt_serialize::<DefCfg>(writer)
     }
 
     fn read_len(reader: &mut impl Read) -> Result<Self::Len, DeserializeError> {
-        Self::mt_deserialize::<DefCfg>(reader)?
-            .try_into()
-            .map_err(Into::into)
+        Ok(Self::mt_deserialize::<DefCfg>(reader)?.try_into()?)
     }
 }
 

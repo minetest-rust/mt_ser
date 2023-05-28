@@ -299,7 +299,14 @@ fn deserialize_args(args: &MtArgs, code: &mut TokStr) {
                 );
                 let __reader = &mut __owned_reader;
 
-                #code
+                let __result = { #code };
+
+                std::io::Read::read_to_end(
+                    __reader,
+                    &mut Vec::with_capacity(__reader.limit() as usize),
+                )?;
+
+                __result
             }
         };
     }
